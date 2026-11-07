@@ -19,13 +19,21 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     price_list_enum = sa.Enum("RETAIL", "WHOLESALE", "B2B", "SPECIAL", name="price_list")
     price_list_enum.create(op.get_bind(), checkfirst=True)
+    price_list_type = sa.Enum(
+        "RETAIL",
+        "WHOLESALE",
+        "B2B",
+        "SPECIAL",
+        name="price_list",
+        create_type=False,
+    )
 
     op.create_table(
         "customer",
         sa.Column("id", sa.String(length=36), nullable=False),
         sa.Column("name", sa.String(length=512), nullable=False),
         sa.Column("email", sa.String(length=256), nullable=True),
-        sa.Column("price_list", price_list_enum, nullable=False, server_default="RETAIL"),
+        sa.Column("price_list", price_list_type, nullable=False, server_default="RETAIL"),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column(
             "created_at",
@@ -37,7 +45,7 @@ def upgrade() -> None:
     )
     op.create_table(
         "product_price",
-        sa.Column("price_list", price_list_enum, nullable=False),
+        sa.Column("price_list", price_list_type, nullable=False),
         sa.Column("sku", sa.String(length=128), nullable=False),
         sa.Column("amount_cents", sa.Integer(), nullable=False),
         sa.Column("currency", sa.String(length=3), nullable=False, server_default="RUB"),

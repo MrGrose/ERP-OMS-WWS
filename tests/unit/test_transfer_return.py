@@ -1,14 +1,14 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import erp_oms_wms.domains.returns.service as return_service
+import erp_oms_wms.domains.transfers.service as transfer_service
 from erp_oms_wms.domains.inventory import service as inventory_service
 from erp_oms_wms.domains.inventory.enums import StockMovementType
 from erp_oms_wms.domains.inventory.models import InventoryLevel, StockMovement
 from erp_oms_wms.domains.orders.enums import OrderStatus
 from erp_oms_wms.domains.orders.models import Order, OrderLine
-from erp_oms_wms.domains.returns import service as return_service
 from erp_oms_wms.domains.returns.enums import ReturnStatus
-from erp_oms_wms.domains.transfers import service as transfer_service
 from erp_oms_wms.domains.transfers.enums import WarehouseTransferStatus
 
 

@@ -1,25 +1,27 @@
+from collections.abc import Generator
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import erp_oms_wms.domains.audit.models as audit_models  # noqa: F401
+import erp_oms_wms.domains.catalog.models as catalog_models  # noqa: F401
+import erp_oms_wms.domains.customers.models as customer_models  # noqa: F401
+import erp_oms_wms.domains.inventory.models as inventory_models  # noqa: F401
+import erp_oms_wms.domains.invoices.models as invoice_models  # noqa: F401
+import erp_oms_wms.domains.orders.models as order_models  # noqa: F401
+import erp_oms_wms.domains.payments.models as payment_models  # noqa: F401
+import erp_oms_wms.domains.pricing.models as pricing_models  # noqa: F401
+import erp_oms_wms.domains.purchasing.models as purchasing_models  # noqa: F401
+import erp_oms_wms.domains.returns.models as return_models  # noqa: F401
+import erp_oms_wms.domains.suppliers.models as supplier_models  # noqa: F401
+import erp_oms_wms.domains.transfers.models as transfer_models  # noqa: F401
+import erp_oms_wms.domains.warehouses.models as warehouse_models  # noqa: F401
 from erp_oms_wms.db import Base
-from erp_oms_wms.domains.audit import models as audit_models  # noqa: F401
-from erp_oms_wms.domains.catalog import models as catalog_models  # noqa: F401
-from erp_oms_wms.domains.customers import models as customer_models  # noqa: F401
-from erp_oms_wms.domains.inventory import models as inventory_models  # noqa: F401
-from erp_oms_wms.domains.invoices import models as invoice_models  # noqa: F401
-from erp_oms_wms.domains.orders import models as order_models  # noqa: F401
-from erp_oms_wms.domains.payments import models as payment_models  # noqa: F401
-from erp_oms_wms.domains.pricing import models as pricing_models  # noqa: F401
-from erp_oms_wms.domains.purchasing import models as purchasing_models  # noqa: F401
-from erp_oms_wms.domains.returns import models as return_models  # noqa: F401
-from erp_oms_wms.domains.suppliers import models as supplier_models  # noqa: F401
-from erp_oms_wms.domains.transfers import models as transfer_models  # noqa: F401
-from erp_oms_wms.domains.warehouses import models as warehouse_models  # noqa: F401
 
 
 @pytest.fixture()
-def db_session() -> Session:
+def db_session() -> Generator[Session, None, None]:
     engine = create_engine("sqlite+pysqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, autoflush=False, autocommit=False)

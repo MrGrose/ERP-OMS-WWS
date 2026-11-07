@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import erp_oms_wms.domains.purchasing.service as purchasing_service
 from erp_oms_wms.domains.inventory.enums import StockMovementType
 from erp_oms_wms.domains.inventory.models import InventoryLevel, StockMovement
-from erp_oms_wms.domains.purchasing import service as purchasing_service
 from erp_oms_wms.domains.purchasing.enums import GoodsReceiptStatus, PurchaseOrderStatus
 from tests.helpers import ensure_supplier
 

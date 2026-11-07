@@ -6,12 +6,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import erp_oms_wms.domains.pricing.service as pricing_service
 from erp_oms_wms.api.deps import get_db
 from erp_oms_wms.db import Base
 from erp_oms_wms.domains.inventory import models as inventory_models  # noqa: F401
 from erp_oms_wms.domains.orders import models as order_models  # noqa: F401
 from erp_oms_wms.domains.pricing import models as pricing_models  # noqa: F401
-from erp_oms_wms.domains.pricing import service as pricing_service
 from erp_oms_wms.domains.pricing.enums import PriceList
 
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")

@@ -3,19 +3,20 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+import erp_oms_wms.domains.invoices.service as invoice_service
+import erp_oms_wms.domains.payments.service as payment_service
 from erp_oms_wms.domains.inventory import service as inventory_service
 from erp_oms_wms.domains.inventory.models import InventoryLevel
-from erp_oms_wms.domains.invoices import service as invoice_service
 from erp_oms_wms.domains.invoices.enums import InvoiceStatus
 from erp_oms_wms.domains.invoices.models import Invoice
 from erp_oms_wms.domains.orders import service as order_service
 from erp_oms_wms.domains.orders.enums import OrderStatus
-from erp_oms_wms.domains.payments import service as payment_service
+from erp_oms_wms.domains.orders.models import Order
 from erp_oms_wms.domains.payments.enums import PaymentAttemptStatus
 from tests.helpers import seed_retail_price
 
 
-def _reserved_order(db_session: Session):
+def _reserved_order(db_session: Session) -> Order:
     inventory_service.apply_receipt(db_session, "wh-1", "SKU-P", 10, "gr", "p1")
     seed_retail_price(db_session, "SKU-P", 2500)
     order = order_service.create_draft_order(

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from erp_oms_wms.domains.pricing import service as pricing_service
+import erp_oms_wms.domains.pricing.service as pricing_service
 from erp_oms_wms.domains.pricing.enums import PriceList
 from erp_oms_wms.domains.suppliers.models import Supplier
 

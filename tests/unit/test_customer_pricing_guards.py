@@ -1,7 +1,7 @@
 import pytest
 from sqlalchemy.orm import Session
 
-from erp_oms_wms.domains.customers import service as customer_service
+import erp_oms_wms.domains.customers.service as customer_service
 from erp_oms_wms.domains.orders import service as order_service
 from erp_oms_wms.domains.orders.errors import InvalidOrderTransitionError
 from erp_oms_wms.domains.pricing.enums import PriceList

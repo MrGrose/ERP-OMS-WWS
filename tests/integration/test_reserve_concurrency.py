@@ -1,37 +1,24 @@
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from erp_oms_wms.db import Base
+import erp_oms_wms.domains.pricing.service as pricing_service
 from erp_oms_wms.domains.inventory import service as inventory_service
 from erp_oms_wms.domains.inventory.errors import InsufficientAvailableError
 from erp_oms_wms.domains.inventory.models import InventoryLevel
 from erp_oms_wms.domains.orders import service as order_service
 from erp_oms_wms.domains.orders.errors import InvalidOrderTransitionError
-from erp_oms_wms.domains.pricing import service as pricing_service
 from erp_oms_wms.domains.pricing.enums import PriceList
+from tests.integration.conftest import truncate_public_schema
 
 pytestmark = pytest.mark.integration
 
-DATABASE_URL = os.environ.get("TEST_DATABASE_URL") or os.environ.get("DATABASE_URL")
 
-
-@pytest.fixture(scope="module")
-def pg_engine():
-    if not DATABASE_URL or not DATABASE_URL.startswith("postgresql"):
-        pytest.skip("TEST_DATABASE_URL или DATABASE_URL (postgresql) не задан")
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    Base.metadata.create_all(engine)
-    yield engine
-    Base.metadata.drop_all(engine)
-    engine.dispose()
-
-
-# Два параллельных reserve на последнюю единицу: один успех, один отказ (BR).
-def test_concurrent_reserve_last_unit(pg_engine) -> None:
+def test_concurrent_reserve_last_unit(pg_engine: Engine) -> None:
+    truncate_public_schema(pg_engine)
     factory = sessionmaker(bind=pg_engine, autoflush=False, autocommit=False)
 
     def seed() -> None:
@@ -90,3 +77,4 @@ def test_concurrent_reserve_last_unit(pg_engine) -> None:
         assert level.available == 0
     finally:
         session.close()
+        truncate_public_schema(pg_engine)

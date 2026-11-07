@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session
 
-from erp_oms_wms.domains.customers import service as customer_service
+import erp_oms_wms.domains.customers.service as customer_service
+import erp_oms_wms.domains.pricing.service as pricing_service
+import erp_oms_wms.domains.reporting.service as reporting_service
 from erp_oms_wms.domains.inventory import service as inventory_service
 from erp_oms_wms.domains.orders import service as order_service
-from erp_oms_wms.domains.pricing import service as pricing_service
 from erp_oms_wms.domains.pricing.enums import PriceList
-from erp_oms_wms.domains.reporting import service as reporting_service
 
 
 def test_customer_price_list_on_confirm(db_session: Session) -> None:

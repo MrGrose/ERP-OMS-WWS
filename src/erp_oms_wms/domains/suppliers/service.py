@@ -34,7 +34,6 @@ def get_supplier(session: Session, supplier_id: str) -> Supplier:
 
 def create_supplier_product(
     session: Session,
-    *,
     supplier_id: str,
     sku: str,
     supplier_sku: str,

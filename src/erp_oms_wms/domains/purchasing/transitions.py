@@ -24,11 +24,11 @@ def assert_po_transition(current: PurchaseOrderStatus, target: PurchaseOrderStat
     if target not in PO_TRANSITIONS.get(current, frozenset()):
         from erp_oms_wms.domains.purchasing.errors import InvalidPurchasingTransitionError
 
-        raise InvalidPurchasingTransitionError(f"PO {current.value} → {target.value} запрещён")
+        raise InvalidPurchasingTransitionError(f"PO {current.value} -> {target.value} запрещен")
 
 
 def assert_gr_transition(current: GoodsReceiptStatus, target: GoodsReceiptStatus) -> None:
     if target not in GR_TRANSITIONS.get(current, frozenset()):
         from erp_oms_wms.domains.purchasing.errors import InvalidPurchasingTransitionError
 
-        raise InvalidPurchasingTransitionError(f"GR {current.value} → {target.value} запрещён")
+        raise InvalidPurchasingTransitionError(f"GR {current.value} -> {target.value} запрещен")

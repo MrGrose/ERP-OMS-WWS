@@ -28,10 +28,9 @@ def _positive_int(value: object, field: str) -> int:
     return value
 
 
-# Создаёт закупку в DRAFT.
+# Создает закупку в DRAFT.
 def create_purchase_order(
     session: Session,
-    *,
     supplier_id: str,
     lines: list[dict[str, object]],
 ) -> PurchaseOrder:
@@ -64,11 +63,10 @@ def confirm_purchase_order(session: Session, purchase_order_id: str) -> Purchase
     return po
 
 
-# Создаёт приёмку по строкам ПО (DRAFT).
+# Создает приемку по строкам ПО (DRAFT).
 def create_goods_receipt(
     session: Session,
     purchase_order_id: str,
-    *,
     lines: list[dict[str, object]],
 ) -> GoodsReceipt:
     po = _load_po(session, purchase_order_id)
@@ -100,7 +98,7 @@ def create_goods_receipt(
     return gr
 
 
-# Подтверждает приёмку: StockMovement RECEIPT, обновление PO.
+# Подтверждает приемку: StockMovement RECEIPT, обновление PO.
 def confirm_goods_receipt(session: Session, goods_receipt_id: str) -> GoodsReceipt:
     gr = _load_gr(session, goods_receipt_id)
     assert_gr_transition(gr.status, GoodsReceiptStatus.CONFIRMED)

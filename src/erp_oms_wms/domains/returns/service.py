@@ -28,7 +28,6 @@ def _load_order(session: Session, order_id: str) -> Order:
 
 def create_return(
     session: Session,
-    *,
     order_id: str,
     warehouse_id: str,
     sku: str,

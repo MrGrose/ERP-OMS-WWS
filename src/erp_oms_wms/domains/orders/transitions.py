@@ -18,7 +18,7 @@ ALLOWED_TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
 def assert_transition(current: OrderStatus, target: OrderStatus) -> None:
     allowed = ALLOWED_TRANSITIONS.get(current, frozenset())
     if target not in allowed:
-        msg = f"Переход заказа {current.value} → {target.value} запрещён"
+        msg = f"Переход заказа {current.value} -> {target.value} запрещен"
         from erp_oms_wms.domains.orders.errors import InvalidOrderTransitionError
 
         raise InvalidOrderTransitionError(msg)

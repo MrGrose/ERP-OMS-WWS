@@ -44,7 +44,6 @@ def reserved_stock(session: Session) -> list[StockRow]:
 
 def list_movements(
     session: Session,
-    *,
     warehouse_id: str | None = None,
     sku: str | None = None,
     limit: int = 500,

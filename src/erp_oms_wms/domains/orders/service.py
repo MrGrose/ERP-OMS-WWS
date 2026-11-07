@@ -19,10 +19,9 @@ def _positive_int(value: object, field: str) -> int:
     return value
 
 
-# Создаёт заказ в статусе DRAFT с позициями.
+# Создает заказ в статусе DRAFT с позициями.
 def create_draft_order(
     session: Session,
-    *,
     customer_id: str | None,
     lines: list[dict[str, object]],
 ) -> Order:
@@ -52,7 +51,7 @@ def compute_order_total_cents(order: Order) -> int:
     return total
 
 
-# Переводит DRAFT → CONFIRMED без резерва.
+# Переводит DRAFT -> CONFIRMED без резерва.
 def confirm_order(session: Session, order_id: str) -> Order:
     order = _load_order(session, order_id)
     assert_transition(order.status, OrderStatus.CONFIRMED)
@@ -70,7 +69,7 @@ def confirm_order(session: Session, order_id: str) -> Order:
     return order
 
 
-# Резервирует все позиции и переводит CONFIRMED → RESERVED.
+# Резервирует все позиции и переводит CONFIRMED -> RESERVED.
 def reserve_order(session: Session, order_id: str) -> Order:
     order = _load_order(session, order_id)
     assert_transition(order.status, OrderStatus.RESERVED)
@@ -104,7 +103,7 @@ def cancel_order(session: Session, order_id: str) -> Order:
     return order
 
 
-# Перевод RESERVED/PAID → ASSEMBLING (без изменения остатков).
+# Перевод RESERVED/PAID -> ASSEMBLING (без изменения остатков).
 def start_assembling(session: Session, order_id: str) -> Order:
     order = _load_order(session, order_id)
     assert_transition(order.status, OrderStatus.ASSEMBLING)
@@ -126,7 +125,7 @@ def _ship_line_quantity(session: Session, order: Order, line: OrderLine, quantit
         line.reservation_id = None
 
 
-# Частичная отгрузка позиции (заказ остаётся в ASSEMBLING, пока не отгружено всё).
+# Частичная отгрузка позиции (заказ остается в ASSEMBLING, пока не отгружено все).
 def ship_order_line(session: Session, order_id: str, line_id: str, quantity: int) -> Order:
     order = _load_order(session, order_id)
     if order.status != OrderStatus.ASSEMBLING:
@@ -142,7 +141,7 @@ def ship_order_line(session: Session, order_id: str, line_id: str, quantity: int
     return order
 
 
-# Отгрузка: ASSEMBLING → SHIPPED через inventory ship.
+# Отгрузка: ASSEMBLING -> SHIPPED через inventory ship.
 def ship_order(session: Session, order_id: str) -> Order:
     order = _load_order(session, order_id)
     assert_transition(order.status, OrderStatus.SHIPPED)
@@ -163,7 +162,7 @@ def complete_order(session: Session, order_id: str) -> Order:
     return order
 
 
-# Перевод RESERVED → PAID (только после успешной оплаты).
+# Перевод RESERVED -> PAID (только после успешной оплаты).
 def mark_paid(session: Session, order_id: str) -> Order:
     order = _load_order(session, order_id)
     assert_transition(order.status, OrderStatus.PAID)

@@ -9,7 +9,6 @@ from erp_oms_wms.domains.pricing.enums import PriceList
 
 def create_customer(
     session: Session,
-    *,
     name: str,
     email: str | None,
     price_list: PriceList,

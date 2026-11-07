@@ -6,7 +6,6 @@ from erp_oms_wms.domains.audit.models import AuditLog
 
 def record(
     session: Session,
-    *,
     actor: str,
     action: str,
     entity_type: str,
@@ -27,7 +26,6 @@ def record(
 
 def list_for_entity(
     session: Session,
-    *,
     entity_type: str,
     entity_id: str,
     limit: int = 100,

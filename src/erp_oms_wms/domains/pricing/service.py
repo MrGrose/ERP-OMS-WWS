@@ -10,7 +10,6 @@ from erp_oms_wms.domains.pricing.models import ProductPrice
 
 def upsert_price(
     session: Session,
-    *,
     price_list: PriceList,
     sku: str,
     amount_cents: int,
@@ -43,7 +42,6 @@ def list_prices(session: Session, *, price_list: PriceList | None = None) -> lis
 
 def resolve_unit_price_cents(
     session: Session,
-    *,
     sku: str,
     customer_id: str | None,
 ) -> int:

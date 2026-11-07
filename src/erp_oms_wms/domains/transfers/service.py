@@ -14,7 +14,6 @@ from erp_oms_wms.domains.transfers.models import WarehouseTransfer
 
 def create_transfer(
     session: Session,
-    *,
     from_warehouse_id: str,
     to_warehouse_id: str,
     sku: str,

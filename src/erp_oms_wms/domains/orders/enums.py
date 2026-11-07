@@ -1,0 +1,12 @@
+import enum
+
+
+class OrderStatus(enum.StrEnum):
+    DRAFT = "DRAFT"
+    CONFIRMED = "CONFIRMED"
+    RESERVED = "RESERVED"
+    PAID = "PAID"
+    ASSEMBLING = "ASSEMBLING"
+    SHIPPED = "SHIPPED"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"

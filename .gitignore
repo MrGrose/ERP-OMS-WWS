@@ -1,0 +1,34 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+.env
+.env.*
+!.env.example
+!.env.postgres.example
+*.pem
+*.key
+.DS_Store
+
+# Project Foundation / Cursor (локально, не в Git)
+.foundation.json
+.cursor/
+.agents/
+
+# Все dotfiles/dotdirs по умолчанию — затем whitelist ниже
+.*
+
+# Публичные dotfiles/dotdirs (только существующие в репозитории)
+!.gitignore
+!.github/
+!.github/**
+!.dockerignore
+!.env.example
+!.env.postgres.example
+!.pre-commit-config.yaml

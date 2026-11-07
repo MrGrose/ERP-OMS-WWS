@@ -1,315 +1,82 @@
-# ERP Architecture Overview
+# Architecture (as-built)
 
-## Статус
-**CONFIRMED**
+**Статус:** описывает репозиторий Backend MVP. **Не** включает React UI, JWT или отдельные слои `services/` / `repositories/`.
 
-## Назначение
-Высокоуровневая архитектура системы: слои, доменов, data flow, integration points.
+## Контекст системы
 
----
+```text
+Клиенты API (curl, тесты, будущий UI)
+        │ HTTP + заголовки RBAC
+        ▼
+┌───────────────────────────────────────┐
+│  FastAPI  src/erp_oms_wms/main.py     │
+│  routers: src/erp_oms_wms/api/routers/ │
+└───────────────────────────────────────┘
+        │ вызовы функций домена
+        ▼
+┌───────────────────────────────────────┐
+│  Domain logic                         │
+│  src/erp_oms_wms/domains/<domain>/    │
+│  models.py, service.py, enums, errors │
+└───────────────────────────────────────┘
+        │ SQLAlchemy session
+        ▼
+┌───────────────────────────────────────┐
+│  PostgreSQL 16 (source of truth)      │
+│  Alembic: alembic/versions/0001-0007  │
+└───────────────────────────────────────┘
 
-## System Context
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                  ERP-OMS-WWS System                      │
-│  (Orders, Warehouse, Inventory Management)               │
-└─────────────────────────────────────────────────────────┘
-         ↓ Export                ↑ GL Import
-┌─────────────────────────────────────────────────────────┐
-│                      1С (Accounting)                     │
-│  (General Ledger, Balance Sheet, Tax Reporting)          │
-└─────────────────────────────────────────────────────────┘
-
-        ↓ Webhook / API
-┌─────────────────────────────────────────────────────────┐
-│           Payment Gateway (Stripe / PayPal)              │
-└─────────────────────────────────────────────────────────┘
-
-        ← Customer / Supplier integration (future)
-```
-
----
-
-## Layered Architecture
-
-```
-┌───────────────────────────────────────────────────────┐
-│          Frontend Layer                                │
-│  (React, shadcn/ui, Tailwind)                          │
-│  - Order Management UI                                 │
-│  - Inventory Dashboard                                 │
-│  - Warehouse Operations                                │
-│  - Finance Reports                                     │
-└───────────────────────────────────────────────────────┘
-                    ↓ HTTP / REST
-┌───────────────────────────────────────────────────────┐
-│          API Layer (FastAPI)                           │
-│  - /orders, /inventory, /payments, etc                 │
-│  - Request validation, Auth (JWT)                      │
-│  - Response serialization                              │
-└───────────────────────────────────────────────────────┘
-                    ↓ Service layer calls
-┌───────────────────────────────────────────────────────┐
-│        Domain Services (Business Logic)                │
-│  src/<domain>/                                         │
-│  - orders.service.py (order creation, state machine)  │
-│  - inventory.service.py (reserve, shipment, balance)  │
-│  - payments.service.py (PaymentAttempt handling)      │
-│  - warehouse.service.py (transfers, rebalancing)      │
-│  ... (other domain services)                           │
-└───────────────────────────────────────────────────────┘
-                    ↓ ORM calls
-┌───────────────────────────────────────────────────────┐
-│        Data Access Layer (SQLAlchemy ORM)              │
-│  - Models: Order, InventoryLevel, PaymentAttempt, ... │
-│  - Queries: optimized with indexes                     │
-│  - Transactions: SERIALIZABLE for inventory ops       │
-└───────────────────────────────────────────────────────┘
-                    ↓ SQL
-┌───────────────────────────────────────────────────────┐
-│        Database Layer (PostgreSQL)                     │
-│  - Tables: orders, inventory_level, stock_movement,   │
-│    payment_attempt, invoice, audit_log, ...           │
-│  - Constraints: CHECK, UNIQUE, FK                      │
-│  - Triggers: append-only audit_log, stock_movement    │
-└───────────────────────────────────────────────────────┘
+Фон: ARQ worker ← Redis ← jobs/*.py
 ```
 
----
+Внешние системы (реальный PSP, 1С, email) в MVP **не** подключены — только заглушки и webhook endpoint.
 
-## Domain Architecture (12 domains)
+## Слои
 
-```
-                    ┌─────────────────┐
-                    │  Customers      │
-                    └────────┬────────┘
-                             │
-          ┌──────────────────┼──────────────────┐
-          ↓                  ↓                  ↓
-    ┌──────────┐      ┌──────────┐      ┌──────────┐
-    │  Orders  │      │ Pricing  │      │  Audit   │
-    └──┬───────┘      └──────────┘      └──────────┘
-       │
-       │ inits RESERVE
-       ↓
-┌─────────────────────────────────────┐
-│      Inventory Domain (writer)       │
-│  ┌────────────────────────────────┐ │
-│  │  - InventoryLevel              │ │
-│  │  - Reservations (subsystem)    │ │  ← CONFIRMED: Inventory writes on_hand, reserved
-│  │  - Balance = on_hand - reserved│ │
-│  └────────────────────────────────┘ │
-│           ↓ logs                     │
-│      StockMovement                   │
-│  (RECEIPT, SHIPMENT, TRANSFER,      │
-│   RESERVE, RELEASE, ADJUSTMENT,     │
-│   WRITE_OFF, RETURN)                │
-└─────────────────────────────────────┘
-       ↑         ↑         ↑        ↑
-    from      from     from    from
-   Purchasing Orders Warehouse Returns
-       
-       
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│  Purchasing  │  │   Invoices   │  │   Payments   │
-└──────────────┘  └──────────────┘  └──────────────┘
-       │                  │              ↑ writes
-       │ initiates        │              │
-       → GoodsReceipt → Invoice → PaymentAttempt
-       
-       
-┌──────────────┐  ┌──────────────┐
-│  Warehouses  │  │  Suppliers   │
-└──────────────┘  └──────────────┘
-```
+| Слой | Путь | Роль |
+|------|------|------|
+| HTTP | `api/routers/*.py`, `api/schemas.py` | Валидация запроса, RBAC, ответ |
+| Домен | `domains/<name>/service.py` | Бизнес-операции, переходы статусов |
+| Модели | `domains/<name>/models.py` | SQLAlchemy ORM |
+| Инфраструктура | `db.py`, `worker.py`, `compose.yml` | Engine, сессии, ARQ |
 
----
+HTTP-обработчики **не** содержат расчётов остатков и правил заказа — только делегируют в `service.py` того же домена (или смежного через явный вызов).
 
-## Data Flow: Order to Shipment
+## Авторизация
 
-```
-Customer places order
-    ↓
-Orders.create_order()
-    ├─ Validate customer (credit_limit)
-    ├─ Validate items (sku exists, qty > 0)
-    ├─ Check Inventory.available >= qty
-    ├─ Create Order record
-    └─ Emit event: "order.created"
-           ↓
-Inventory.on_order_created()
-    ├─ For each item: RESERVE qty → Inventory.reserved += qty
-    ├─ Create Reservation records
-    ├─ Log: StockMovement (type=RESERVE)
-    └─ Emit event: "reservation.created"
-           ↓
-Invoices.on_order_created()
-    ├─ Create Invoice record (from Order.total)
-    └─ Emit event: "invoice.created"
-           ↓
-Payments.on_invoice_created()
-    ├─ Create PaymentAttempt (status=PENDING)
-    ├─ Send to payment gateway
-    └─ Emit event: "payment.initiated"
-           ↓
-    Payment gateway → callback: status=SUCCESS/FAILED
-           ↓
-Payments.on_payment_completed()
-    ├─ Update PaymentAttempt.status = SUCCESS
-    ├─ Emit event: "payment.success"
-    └─ Update Invoice.status = PAID
-           ↓
-Orders.on_payment_success()
-    ├─ Update Order.status = CONFIRMED
-    ├─ Allow Warehouse to ship
-    └─ Emit event: "order.ready_to_ship"
-           ↓
-Warehouse initiates shipment
-    ├─ Create Shipment record
-    └─ Emit event: "shipment.initiated"
-           ↓
-Inventory.on_shipment_initiated()
-    ├─ SHIPMENT: on_hand -= qty, reserved -= qty
-    ├─ Log: StockMovement (type=SHIPMENT)
-    ├─ Release Reservation
-    └─ Emit event: "shipment.completed"
-           ↓
-Orders.on_shipment_completed()
-    ├─ Update Order.status = SHIPPED
-    ├─ Generate tracking
-    └─ Notify customer
-```
+**IMPLEMENTED:** `api/rbac.py`
 
----
+- `X-User-Role`: `Admin` | `Manager` | `WarehouseOperator` | `Accountant`.
+- Без заголовка в dev по умолчанию трактуется как `Admin` (`get_current_role`).
+- `require_permission(...)` на критичных маршрутах.
 
-## State Machines (per domain)
+JWT/OAuth **OUT OF SCOPE**.
 
-| Entity | States | Transitions |
-|--------|--------|---|
-| **Order** | DRAFT → PENDING → CONFIRMED → SHIPPED → DELIVERED / CANCELLED / FAILED | See docs/04-state-machines/order.md |
-| **PaymentAttempt** | PENDING → SUCCESS / FAILED → REFUNDED | See docs/04-state-machines/payment_attempt.md |
-| **Invoice** | DRAFT → ISSUED → PAID / OVERDUE / CANCELLED | See docs/04-state-machines/invoice.md |
-| **Reservation** | ACTIVE → SHIPPED / RELEASED / PARTIALLY_SHIPPED | See docs/04-state-machines/reservation.md |
-| **PurchaseOrder** | DRAFT → PENDING → RECEIVED → INVOICED → PAID / CANCELLED | See docs/04-state-machines/purchase_order.md |
-| **Shipment** | DRAFT → IN_TRANSIT → DELIVERED / RETURNED | See docs/04-state-machines/warehouse_transfer.md |
+## Домены и API (кратко)
 
----
+Префиксы см. `main.py` (типично `/api/...`): catalog, warehouses, inventory, orders, invoices, payments, customers, pricing, suppliers, purchasing, transfers, returns, audit, reports.
 
-## Database Schema (conceptual)
+**Inventory** — единственный writer `on_hand` / `reserved` на `InventoryLevel`. Orders инициирует reserve/ship через `inventory.service`.
 
-```
-Tables per domain:
+## Данные и целостность
 
-ORDERS domain:
-  - order (id, customer_id, status, total, created_at)
-  - order_line (id, order_id, sku, qty, price)
-  - shipment (id, order_id, status, tracking)
+- Транзакции: `session_scope` / commit в сервисах.
+- Конкуренция: `SELECT … FOR UPDATE` на уровне остатка при резерве (см. [`05-data-integrity/concurrency.md`](../05-data-integrity/concurrency.md)).
+- Идемпотентность платежей: уникальный `external_event_id` + `begin_nested()` в `payments/service.py`.
+- CHECK constraints: остатки, `order_line.quantity_shipped` (миграция `0007`).
 
-INVENTORY domain:
-  - inventory_level (id, warehouse_id, sku, on_hand, reserved)
-  - stock_movement (id, warehouse_id, sku, type, qty_delta, reference_id, created_at)
-  - reservation (id, order_id, sku, warehouse_id, qty, status)
+## Фоновые задачи
 
-PAYMENTS domain:
-  - payment_attempt (id, invoice_id, amount, status, gateway_id)
+Redis + ARQ: `worker.py` регистрирует 6 функций из `jobs/`. Расписание в compose **не** настроено — ручной enqueue или внешний scheduler. См. [`06-tech/background-jobs.md`](../06-tech/background-jobs.md).
 
-INVOICES domain:
-  - invoice (id, type: OUTBOUND/INBOUND, customer_id, total, status)
-  - invoice_line (id, invoice_id, sku, qty, price)
+## Что намеренно отсутствует
 
-AUDIT domain:
-  - audit_log (id, entity_type, entity_id, action, old_value, new_value, user_id, timestamp)
+- Отдельные каталоги `src/services/`, `src/repositories/`.
+- Frontend.
+- Event bus / CQRS — синхронные вызовы сервисов в одной БД.
 
-... (more for Purchasing, Customers, Suppliers, Warehouses)
-```
+## Связанные документы
 
----
-
-## Integration Points
-
-### 1. With 1С (Accounting)
-**Frequency**: Daily export + on-demand  
-**Data**: StockMovement, Order totals, PaymentAttempt, Invoices  
-**Format**: JSON API or flat file  
-**Direction**: ERP → 1С (GL entries, tax reports)
-
-### 2. With Payment Gateway (Stripe)
-**Frequency**: Real-time  
-**Data**: PaymentAttempt creation, webhook callbacks  
-**Format**: REST API + webhook  
-**Direction**: ERP ↔ Stripe (payments, refunds)
-
-### 3. With Warehouse System (future)
-**Frequency**: On demand  
-**Data**: Shipment status, GoodsReceipt  
-**Format**: TBD (currently manual)
-
----
-
-## Constraints & Guarantees
-
-### ACID Properties
-- **Atomicity**: Transactions for critical operations (RESERVE, SHIPMENT, PAYMENT)
-- **Consistency**: DB constraints (CHECK, UNIQUE, FK) + application validation
-- **Isolation**: SERIALIZABLE for inventory, READ_COMMITTED for others
-- **Durability**: PostgreSQL WAL
-
-### Data Integrity
-- Inventory balance = SUM(stock_movement) ✓
-- PaymentAttempt.status = source of truth (not order.is_paid) ✓
-- Audit log append-only (immutable) ✓
-- All changes logged for compliance ✓
-
----
-
-## Scalability & Performance
-
-### Current (Foundation)
-- Single PostgreSQL instance
-- Synchronous API (no async jobs)
-- In-memory caching (optional)
-
-### Phase 2–3 (Growth)
-- Read replicas for reporting
-- Async jobs (APScheduler or Celery)
-- Redis for caching / session
-- Partitioning for large tables (stock_movement, audit_log)
-
-### Phase 4 (Production)
-- Kubernetes deployment
-- Message queue (Kafka / RabbitMQ) for events
-- CDN for static assets
-- Load balancer + auto-scaling
-
----
-
-## Security
-
-- **Authentication**: JWT (users), OAuth (third-party integrations)
-- **Authorization**: Role-based (RBAC): warehouse_manager, buyer, finance, admin
-- **Secrets**: Environment variables / Kubernetes secrets (not in code)
-- **PCI**: Payment data tokenized (not stored in ERP DB)
-- **Audit**: All changes logged with user_id, timestamp
-- **SQL Injection**: Parameterized queries (SQLAlchemy ORM)
-- **CSRF**: CORS + SameSite cookies
-
----
-
-## Monitoring & Observability
-
-- **Logging**: Structured logs (JSON) to centralized sink (ELK, DataDog, etc.)
-- **Metrics**: Request latency, error rates, DB query times (Prometheus)
-- **Tracing**: Distributed tracing for cross-domain flows (Jaeger / DataDog)
-- **Alerting**: PagerDuty for critical issues (payment failures, inventory inconsistency)
-- **Dashboards**: Grafana for real-time visibility
-
----
-
-## See Also
-
-- `docs/02-domain/domain-map.md` — Domains and their relationships
-- `docs/02-domain/cross-domain-flows.md` — Detailed workflows
-- `docs/03-business-rules/registry.md` — Business rules (BR-xxx)
-- `docs/04-state-machines/` — State machine definitions
-- `docs/06-tech/stack-constraints.md` — Tech stack details
+- [`../02-domain/domain-map.md`](../02-domain/domain-map.md)
+- [`../05-data-integrity/concurrency.md`](../05-data-integrity/concurrency.md)
+- [`../06-tech/background-jobs.md`](../06-tech/background-jobs.md)

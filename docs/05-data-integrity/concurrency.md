@@ -1,172 +1,55 @@
-# Целостность данных и concurrency (Data Integrity & Concurrency)
+# Concurrency и целостность
 
-## Статус
-**PROPOSED**
-
-## Назначение
-Гарантии целостности данных при параллельных операциях.
-
----
+**Статус:** as-built Backend MVP
 
 ## Критические операции
 
-### 1. Inventory Level Update (CONFIRMED)
-**Операция**: `on_hand` и `reserved` изменяются одновременно
+### 1. Резервирование (Inventory)
 
-**Проблема**: Race condition
-- Thread A: check available (100)
-- Thread B: check available (100)
-- Thread A: RESERVE(100) → available=0
-- Thread B: RESERVE(100) → available would be −100 (invalid!)
+| Аспект | Состояние |
+|--------|-----------|
+| `SELECT … FOR UPDATE` на `InventoryLevel` | **IMPLEMENTED** (`inventory/service.py`) |
+| Атомарность reserve + movement | **IMPLEMENTED** в одной транзакции |
+| Защита от overselling | **IMPLEMENTED** (insufficient available → error) |
+| Integration тест гонки | **NOT VERIFIED** без PostgreSQL (`test_reserve_concurrency.py`) |
 
-**Решение**: 
-- SELECT ... FOR UPDATE при proверке доступности
-- Транзакция вся операция (RESERVE или SHIPMENT)
-- Atomicity гарантирована DB лок или ORM transaction
+### 2. Payment webhook
 
-```sql
-BEGIN TRANSACTION
-  SELECT on_hand, reserved FROM inventory_level WHERE sku=? FOR UPDATE
-  -- Проверить available >= qty
-  -- INSERT stock_movement
-  UPDATE inventory_level SET reserved = reserved + qty
-COMMIT
-```
+| Аспект | Состояние |
+|--------|-----------|
+| Идемпотентность по `external_event_id` | **IMPLEMENTED** |
+| `begin_nested()` при дубликате | **IMPLEMENTED** |
+| Unit тест | **IMPLEMENTED** `test_payments_invoices.py` |
 
----
+### 3. Частичная отгрузка / double ship
 
-### 2. PaymentAttempt Processing (CONFIRMED)
-**Проблема**: Дважды обработанный платеж
+| Аспект | Состояние |
+|--------|-----------|
+| LIMIT по `quantity_shipped` | **IMPLEMENTED** (CHECK migration `0007`) |
+| Ship вне ASSEMBLING | **IMPLEMENTED** reject |
+| Unit | **IMPLEMENTED** `test_partial_ship.py` |
 
-**Решение**:
-- UUID (idempotency key) для каждого PaymentAttempt
-- Gateway должен быть idempotent (по idempotency key)
-- На запрос одного платежа — один результат (SUCCESS or FAILED)
-- Retry не создает новый платеж
+### 4. Double confirm order
 
----
+| Аспект | Состояние |
+|--------|-----------|
+| Повторный confirm | **IMPLEMENTED** guard (`test_order_service` / customer tests) |
 
-### 3. Reservation Release during Shipment (CONFIRMED)
-**Проблема**: 
-- Order.cancel() → RELEASE резерва
-- Order.ship() → SHIPMENT (on_hand −, reserved −)
-- Если происходит одновременно, может быть двойное −
+### 5. TOCTOU при reserve
 
-**Решение**:
-- Reservation.status = SHIPPED (immutable после SHIPMENT)
-- Попытка RELEASE после SHIPPED → error
+| Аспект | Состояние |
+|--------|-----------|
+| Пре-check без блокировки убран | **IMPLEMENTED** (AUD-002 в readiness audit) |
 
----
+## Разделение подтверждений
 
-### 4. GoodsReceipt and Inventory (PROPOSED)
-**Проблема**: 
-- Приемка товара может быть обработана дважды
+- **Код есть** — логика в `domains/*/service.py`.
+- **Unit tests** — `tests/unit/*` (pytest default без integration).
+- **Integration** — только при `TEST_DATABASE_URL` / marker.
 
-**Решение**:
-- GoodsReceipt.id unique + idempotency key
-- RECEIPT в stock_movement с FK на goods_receipt_id (уникальность)
-- Попытка повторной приемки того же товара → error (duplicate FK)
+## OPEN / PLANNED
 
----
+- Пессимистичные локи на всём каталоге заказов — **не требуется** в MVP.
+- Распределённые транзакции — **OUT OF SCOPE**.
 
-## Уровни изоляции (Isolation Levels)
-
-**Рекомендация**: READ_COMMITTED или SERIALIZABLE в зависимости от нагрузки
-
-| Операция | Уровень | Обоснование |
-|----------|---------|------------|
-| Inventory RESERVE | SERIALIZABLE | Критическая целостность |
-| SHIPMENT | SERIALIZABLE | Критическая целостность |
-| Invoice query | READ_COMMITTED | Чтение данных, не критическое |
-| Audit log INSERT | READ_UNCOMMITTED | Only INSERT, no conflicts |
-
----
-
-## Оптимистичные блокировки (Optimistic Locking)
-
-Используется для слабо конкурентных операций:
-- Order.update (change details)
-- Customer.update (change address)
-
-**Механизм**:
-- Таблица: `updated_at` / `version` field
-- UPDATE проверяет: WHERE id=? AND version=?
-- Если version не совпадает (обновлено другим потоком) → error (retry)
-
-```python
-# ORM пример (SQLAlchemy)
-order.address = "new address"
-order.version += 1
-session.commit()  # Если version изменился кем-то еще → IntegrityError
-```
-
----
-
-## Dead Lock Prevention
-
-**Правило**: Всегда блокировать таблицы в одном порядке
-
-Если операция A блокирует (Inventory → Order), операция B должна блокировать (Inventory → Order), не (Order → Inventory)
-
-```python
-# Good: consistent lock order
-with database.transaction():
-    inventory_lock = db.query(InventoryLevel).filter(...).with_for_update()
-    order_lock = db.query(Order).filter(...).with_for_update()
-
-# Bad: different order (deadlock risk)
-with database.transaction():
-    order_lock = db.query(Order).filter(...).with_for_update()
-    inventory_lock = db.query(InventoryLevel).filter(...).with_for_update()
-```
-
----
-
-## Event Sourcing (PROPOSED)
-
-Для StockMovement и Orders рассмотреть Event Sourcing:
-- Каждая операция = immutable event
-- State (on_hand, order.status) = projection events
-- Advantage: full audit trail, time-travel debugging
-- Disadvantage: complexity, storage
-
----
-
-## Тестовые сценарии
-
-### Test: Concurrent RESERVE
-```
-Thread A: RESERVE(50) для Order 1
-Thread B: RESERVE(50) для Order 2
-on_hand = 100, reserved = 0
-
-Expected:
-- One thread succeeds (reserved = 50)
-- Other thread fails (available < 50)
-```
-
-### Test: Concurrent SHIPMENT and CANCEL
-```
-Thread A: ship() → SHIPMENT (on_hand−, reserved−)
-Thread B: cancel() → RELEASE (reserved−)
-reserved = 50
-
-Race:
-- If A wins: on_hand−50, reserved−50 ✓
-- If B wins: error (already shipped) ✓
-```
-
-### Test: Double GoodsReceipt
-```
-Request 1: GoodsReceipt(po_id=123, qty=100) → SUCCESS
-Request 2: GoodsReceipt(po_id=123, qty=100) → ERROR (duplicate on PO)
-```
-
----
-
-## OPEN вопросы
-
-- [ ] Load testing: какой уровень concurrency ожидается?
-- [ ] Timeout: сколько ждать блокировку перед retry?
-- [ ] Monitoring: как отслеживать deadlocks и race conditions?
-- [ ] Circuit breaker: если payment gateway перегружен, как fallback?
+См. также [`../02-domain/domain-map.md`](../02-domain/domain-map.md) (Inventory — единственный writer остатков).

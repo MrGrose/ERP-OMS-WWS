@@ -1,58 +1,45 @@
-# Context — Mini ERP / OMS / WMS Backend
+# Context — ERP-OMS-WMS
 
-## Purpose
+**Статус:** Backend MVP (as-built), PostgreSQL, Alembic `0001`–`0007`.
 
-**CONFIRMED.** Компактный backend для каталога, складов, заказов, закупок, счетов, платежей и аудита. Демонстрация согласованной предметной модели и инженерии (PostgreSQL, транзакции, конкуренция). Не полноценная 1С.
+## Назначение
 
-## Users
+Один сервис: каталог, склады, остатки и резервы, заказы, закупки, счета, платежи, трансферы, возвраты (частично), отчёты, audit. Демонстрация согласованной доменной модели: транзакции, конкурентный резерв, идемпотентность webhook.
 
-**CONFIRMED:** Admin, Manager, WarehouseOperator, Accountant (роли из ТЗ).
+## Доступ (MVP)
 
-## Stack
+Роли через заголовки `X-User-Role` / `X-User-Id`. JWT/OAuth нет.
 
-FastAPI, PostgreSQL, SQLAlchemy 2.x, Alembic, Redis, ARQ, Pydantic, Docker Compose, pytest, GitHub Actions. См. [`06-tech/stack-constraints.md`](06-tech/stack-constraints.md).
+## Домены (кратко)
 
-## Scope
-
-| Входит | Не входит |
-|--------|-----------|
-| OMS/WMS/закупки/инвентарь/платежи/аудит | GL, двойная запись, 1С (**OUT_OF_SCOPE**) |
-| REST API, jobs, отчёты backend | Frontend/admin UI на этапе foundation (**OUT_OF_SCOPE**) |
-
-## Requirements source
-
-**CONFIRMED:** [`requirements/ERP-OMS-WMS.md`](requirements/ERP-OMS-WMS.md) — единственный канон ТЗ.
-
-## Hub — документация
-
-| Раздел | Файл |
+| Домен | Роль |
 |--------|------|
-| Vision / architecture | [`01-overview/vision.md`](01-overview/vision.md), [`01-overview/architecture.md`](01-overview/architecture.md) |
-| Domain map | [`02-domain/domain-map.md`](02-domain/domain-map.md) |
-| Домены (шаблон A) | [`02-domain/_DOMAIN_TEMPLATE.md`](02-domain/_DOMAIN_TEMPLATE.md), `02-domain/*.md` |
-| Reservations | [`02-domain/inventory-reservations.md`](02-domain/inventory-reservations.md) |
-| Междоменные потоки | [`02-domain/cross-domain-flows.md`](02-domain/cross-domain-flows.md) |
-| Stock movements | [`02-domain/stock-movement-semantics.md`](02-domain/stock-movement-semantics.md) |
-| Бизнес-правила | [`03-business-rules/registry.md`](03-business-rules/registry.md) |
-| State machines | [`04-state-machines/`](04-state-machines/) |
-| Concurrency | [`05-data-integrity/concurrency.md`](05-data-integrity/concurrency.md) |
-| Tech / jobs | [`06-tech/`](06-tech/) |
-| Testing | [`07-testing/strategy.md`](07-testing/strategy.md) |
-| Локальная разработка | [`02-development/local-setup.md`](02-development/local-setup.md) |
-| DoR / DoD | [`definition-of-ready.md`](definition-of-ready.md), [`definition-of-done.md`](definition-of-done.md) |
-| OPEN | [`open-questions.md`](open-questions.md) |
-| Final readiness | [`reports/final-readiness-audit.md`](reports/final-readiness-audit.md) |
+| inventory | Единственный writer `on_hand` / `reserved` / movements |
+| orders | Lifecycle заказа, инициирует reserve/ship |
+| invoices / payments | Счёт, `PaymentAttempt`, webhook |
+| purchasing | PO → goods receipt → RECEIPT |
+| pricing / customers | Price lists, цена при confirm |
+| … | См. [`02-domain/domain-map.md`](02-domain/domain-map.md) |
 
-## Glossary (кратко)
+## Инварианты
 
-- **on_hand** — физический остаток. **reserved** — резерв. **available** = on_hand − reserved (**CONFIRMED**).
-- **StockMovement** — журнал изменений остатков (**CONFIRMED**).
-- **PaymentAttempt** — источник истины оплаты (**CONFIRMED**).
+- `available = on_hand - reserved` (сервис + CHECK в БД).
+- Резерв не уменьшает `on_hand`; отгрузка — `SHIPMENT`.
+- Оплата: источник истины — `PaymentAttempt`.
 
-## Invariants (кратко)
+## Ограничения MVP
 
-См. **BR-001…** в [`03-business-rules/registry.md`](03-business-rules/registry.md). Inventory — единственный writer остатков. Резерв не уменьшает on_hand.
+- Нет UI, refund, GL, production IAM.
+- `ADJUSTMENT` в enum; публичного adjust API нет.
+- Часть ARQ jobs — stub (`send_notifications`, `reconcile_payments`).
+- Integration-тесты на PG: локально (`-m integration`), не в `ci.yml`.
 
-## External systems
+## Публичная навигация
 
-**OPEN** (провайдеры платежей, внешние SKU) — см. [`open-questions.md`](open-questions.md).
+| Тема | Файл |
+|------|------|
+| Индекс | [`README.md`](README.md) |
+| Архитектура | [`01-overview/architecture.md`](01-overview/architecture.md) |
+| Карта доменов | [`02-domain/domain-map.md`](02-domain/domain-map.md) |
+| Конкурентность | [`05-data-integrity/concurrency.md`](05-data-integrity/concurrency.md) |
+| Jobs | [`06-tech/background-jobs.md`](06-tech/background-jobs.md) |

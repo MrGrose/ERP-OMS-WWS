@@ -5,7 +5,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/erp-oms-wms
+      DATABASE_URL: postgresql+psycopg://user:password@postgres:5432/erp-oms-wms
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,7 +49,7 @@ services:
     restart: unless-stopped
     command: ["uv", "run", "arq", "erp_oms_wms.worker.WorkerSettings"]
     environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/erp-oms-wms
+      DATABASE_URL: postgresql+psycopg://user:password@postgres:5432/erp-oms-wms
       REDIS_HOST: redis
       REDIS_PORT: "6379"
     depends_on:

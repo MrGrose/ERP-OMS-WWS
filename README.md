@@ -312,7 +312,7 @@ docker compose up --build
 - Параллельный дублирующий webhook
 - Конкурентный резерв последней единицы
 
-CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Ruff, mypy, pytest, `docker compose config`, `alembic upgrade head` на service Postgres.
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Python 3.12, `uv sync --frozen`, Ruff (lint + format), mypy, unit pytest с coverage, integration pytest на PostgreSQL 16 (service container; `TEST_DATABASE_URL`; схема через `alembic upgrade head` в fixtures), `docker compose --env-file .env.postgres.example config --quiet`.
 
 ---
 

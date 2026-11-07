@@ -15,16 +15,7 @@ build/
 *.pem
 *.key
 .DS_Store
-
-# Project Foundation / Cursor (локально, не в Git)
-.foundation.json
-.cursor/
-.agents/
-
-# Все dotfiles/dotdirs по умолчанию — затем whitelist ниже
 .*
-
-# Публичные dotfiles/dotdirs (только существующие в репозитории)
 !.gitignore
 !.github/
 !.github/**

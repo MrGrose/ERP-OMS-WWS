@@ -344,3 +344,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Python 3.12, `uv sy
 - **Single-process deployment** — нет руководства по multi-tenant и горизонтальному масштабированию.
 
 Для production ERP закладывайте отдельные auth (не только `X-User-Role`), ops и свой чеклист hardening.
+
+## Лицензия
+
+MIT. См. [LICENSE](LICENSE).

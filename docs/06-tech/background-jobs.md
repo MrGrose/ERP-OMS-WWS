@@ -11,7 +11,7 @@
 | `generate_reports` | Прогон reporting агрегатов, возвращает счётчик строк | **IMPLEMENTED** stub-observable | Вручную |
 | `reconcile_payments` | Счётчик PENDING `PaymentAttempt` | **PARTIAL** (read-only count) | Вручную |
 | `sync_supplier_prices` | Перечитывание supplier products | **PARTIAL** (no-op sync count) | Вручную |
-| `send_notifications` | «Уведомления» | **PARTIAL** — дублирует expire count, без отправки | Вручную |
+| `send_notifications` | «Уведомления» | **STUB** — ничего не отправляет и не меняет данные | Вручную |
 
 ## Инфраструктура
 

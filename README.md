@@ -44,7 +44,7 @@
 | Warehouse transfers | Реализовано | Domain + unit-тесты |
 | Returns | Частично | Create (заказ `SHIPPED`/`COMPLETED`), accept → движение `RETURN`, cancel; без list API и refund |
 | Reporting | Реализовано | Stock, sales summary, unpaid invoices |
-| Audit log | Реализовано | Запись при мутирующих операциях (actor из контекста запроса) |
+| Audit log | Частично | Запись в catalog, customers, suppliers, transfers, returns; orders, inventory, invoices, payments, purchasing пока без аудита |
 | Background jobs (ARQ) | Частично | Invoice expiry подключён; notifications/reconcile — заглушки |
 | HTTP API (FastAPI) | Реализовано | Routers по доменам под `/api/...` |
 | RBAC | Частично | Проверки на routes через `X-User-Role` (dev/demo transport; не production authentication) |
@@ -167,7 +167,7 @@ flowchart LR
 | Invoice expiry | Неоплаченный заказ держит резерв | `expire_due_invoices` + cancel/release (идемпотентный повтор на PG) |
 | Background work | Периодическая очистка | ARQ (`erp_oms_wms.worker.WorkerSettings`); часть jobs — MVP stubs |
 | RBAC | Разграничение по ролям | `require_roles` / `require_permission`; `X-User-Role` для локальной демонстрации, **не** замена JWT/OAuth/IAM |
-| Audit | Кто и что изменил | `audit.record` на мутирующих API paths |
+| Audit | Кто и что изменил | `audit.record` в domain services (catalog, customers, suppliers, transfers, returns); ключевые потоки заказов и склада пока без записи |
 
 Описанные инженерные решения подтверждаются кодом и тестами. Формальная верификация и production hardening не проводились.
 
@@ -179,7 +179,7 @@ flowchart LR
 
 | Технология | Назначение |
 |------------|------------|
-| Python 3.13+ | Runtime |
+| Python 3.12+ | Runtime |
 | FastAPI ≥ 0.115 | HTTP API, OpenAPI |
 | SQLAlchemy 2.x ≥ 2.0.36 | ORM, sessions |
 | psycopg 3 ≥ 3.2 | Драйвер PostgreSQL (`postgresql+psycopg://`) |
@@ -223,7 +223,7 @@ ERP-OMS-WMS/
 
 ### Требования
 
-- Python **3.13+**
+- Python **3.12+**
 - [uv](https://docs.astral.sh/uv/) (рекомендуется) или pip
 - Docker и Docker Compose
 
@@ -340,6 +340,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): Python 3.12, `uv sy
 - **Returns (частично)** — `POST /returns`, `POST /returns/{id}/accept`, `POST /returns/{id}/cancel` для `SHIPPED`/`COMPLETED`; accept пишет `RETURN` в inventory. Нет: refunds, расширенного RMA, listing, полного набора правил из requirements.
 - **Background jobs** — `send_notifications` и `reconcile_payments` — заглушки; expiry и reporting — рабочие пути.
 - **Нет GL / double-entry** — финансовая правда: invoice + payment attempt.
+- **Audit coverage** — аудит пишется не во всех доменах: заказы, остатки, счета, платежи и закупки пока без записей.
 - **Single-process deployment** — нет руководства по multi-tenant и горизонтальному масштабированию.
 
 Для production ERP закладывайте отдельные auth (не только `X-User-Role`), ops и свой чеклист hardening.

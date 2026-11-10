@@ -1,4 +1,4 @@
-.PHONY: dev test lint worker migrate
+.PHONY: dev test lint typecheck worker migrate
 
 dev:
 	uv run uvicorn erp_oms_wms.main:app --reload
@@ -8,6 +8,9 @@ test:
 
 lint:
 	uv run ruff check . && uv run ruff format --check . && uv run mypy src
+
+typecheck:
+	uv run mypy src
 
 migrate:
 	uv run alembic upgrade head
